@@ -16,11 +16,11 @@
 
             <div>
               <v-text-field
-                label="Main input"
+                label="API username"
                 :rules="rules"
                 hide-details="auto"
               ></v-text-field>
-              <v-text-field label="Another input"></v-text-field>
+              <v-text-field label="Application password"></v-text-field>
             </div>
           <v-btn
             color="primary"
@@ -42,6 +42,7 @@
               <v-file-input
                 accept=".xlsx"
                 label="File input"
+                v-model="xlsInput"
               ></v-file-input>
           </div>
           <v-btn
@@ -55,34 +56,12 @@
           </v-btn>
         </v-stepper-content>
 
-        <v-stepper-step
+        <v-stepper-step           
           :complete="e6 > 3"
-          step="3"
-        >
-          Confirm incident column
-        </v-stepper-step>
-
-        <v-stepper-content step="3">
-          <v-card
-            color="grey lighten-1"
-            class="mb-12"
-            height="200px"
-          ></v-card>
-          <v-btn
-            color="primary"
-            @click="e6 = 4"
-          >
-            Continue
-          </v-btn>
-          <v-btn text @click="e6 = 2">
-            Back
-          </v-btn>
-        </v-stepper-content>
-
-        <v-stepper-step :complete="e6 > 4" step="4">
+          step="3">
           Choose fields to be updated
         </v-stepper-step>
-        <v-stepper-content step="4">
+        <v-stepper-content step="3">
           <v-row class="ma-5" v-for="possibility in possibilities" :key="possibility">
             <v-checkbox
               v-model="enabled"
@@ -95,11 +74,14 @@
           </v-row>
           <v-btn
             color="primary"
-            @click="e6 = 5"
+            @click="()=>{
+              e6 = 4
+              bulkEdit()
+            }"
           >
             Update
           </v-btn>
-          <v-btn text @click="e6 = 3">
+          <v-btn text @click="e6 = 2">
             Back
           </v-btn>
         </v-stepper-content>
@@ -124,6 +106,7 @@
         outlined
         large
         color="primary"
+        v-if="value === 100"
         @mouseenter="()=>{
           completeText = 'New Edit'
           completeIcon = 'mdi-pencil-outline'
@@ -131,6 +114,9 @@
         @mouseleave="()=>{
           completeText = 'Update Completed'
           completeIcon = 'mdi-check-all'
+        }"
+        @click="()=>{
+          resetForm()
         }"
       >
         <v-icon left>{{completeIcon}}</v-icon>
@@ -151,6 +137,9 @@ export default {
   data () {
       return {
         e6: 1,
+        apiUser: '',
+        apiPassword: '',
+        xlsInput: {},
         interval: {},
         value: 0,
         completeText: "Update Completed",
@@ -158,22 +147,32 @@ export default {
         enabled: false,
         possibilities: ["caller","branch", "short description", "category", "subcategory", "object", "operator", "operator group", "processing status", "supplier"],
         rules: [
-        value => !!value || 'Required.',
-        value => (value && value.length >= 3) || 'Min 3 characters',
-      ]
+          value => !!value || 'Required.',
+          value => (value && value.length >= 3) || 'Min 3 characters',
+        ]
       }
     },
   beforeDestroy () {
     clearInterval(this.interval)
   },
-  mounted () {
-    this.interval = setInterval(() => {
+  mounted () {},
+
+  methods: {
+    resetForm: function(){
+      this.e6 = 1
+      this.xlsInput = {}
+      this.value = 0
+    },
+
+    bulkEdit: function(){
+      this.interval = setInterval(() => {
       if (this.value === 100) {
         return (this.value = 100)
       }
       this.value += 10
     }, 1000)
-  },
+    }
+  }
 }
 </script>
 
