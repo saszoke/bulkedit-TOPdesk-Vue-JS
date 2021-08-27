@@ -13,11 +13,15 @@
         </v-stepper-step>
 
         <v-stepper-content step="1">
-          <v-card
-            color="grey lighten-1"
-            class="mb-12"
-            height="200px"
-          ></v-card>
+
+            <div>
+              <v-text-field
+                label="Main input"
+                :rules="rules"
+                hide-details="auto"
+              ></v-text-field>
+              <v-text-field label="Another input"></v-text-field>
+            </div>
           <v-btn
             color="primary"
             @click="e6 = 2"
@@ -34,11 +38,12 @@
         </v-stepper-step>
 
         <v-stepper-content step="2">
-          <v-card
-            color="grey lighten-1"
-            class="mb-12"
-            height="200px"
-          ></v-card>
+          <div>
+              <v-file-input
+                accept=".xlsx"
+                label="File input"
+              ></v-file-input>
+          </div>
           <v-btn
             color="primary"
             @click="e6 = 3"
@@ -78,11 +83,16 @@
           Choose fields to be updated
         </v-stepper-step>
         <v-stepper-content step="4">
-          <v-card
-            color="grey lighten-1"
-            class="mb-12"
-            height="200px"
-          ></v-card>
+          <v-row class="ma-5" v-for="possibility in possibilities" :key="possibility">
+            <v-checkbox
+              v-model="enabled"
+              hide-details
+            ></v-checkbox>
+            <v-text-field
+              :disabled="!enabled"
+              :label="possibility"
+            ></v-text-field>
+          </v-row>
           <v-btn
             color="primary"
             @click="e6 = 5"
@@ -109,7 +119,7 @@
 
     <div class="d-flex justify-center">
       <v-btn
-
+        width="200px"
         class="ma-3 text-center"
         outlined
         large
@@ -144,7 +154,13 @@ export default {
         interval: {},
         value: 0,
         completeText: "Update Completed",
-        completeIcon: "mdi-check-all"
+        completeIcon: "mdi-check-all",
+        enabled: false,
+        possibilities: ["caller","branch", "short description", "category", "subcategory", "object", "operator", "operator group", "processing status", "supplier"],
+        rules: [
+        value => !!value || 'Required.',
+        value => (value && value.length >= 3) || 'Min 3 characters',
+      ]
       }
     },
   beforeDestroy () {
@@ -153,7 +169,7 @@ export default {
   mounted () {
     this.interval = setInterval(() => {
       if (this.value === 100) {
-        return (this.value = 0)
+        return (this.value = 100)
       }
       this.value += 10
     }, 1000)
