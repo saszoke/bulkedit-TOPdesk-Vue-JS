@@ -37,11 +37,7 @@
           <v-btn
             color="primary"
             :disabled="!stepOneDone"
-            @click="()=>{
-              if (validate([URLrules, rules, PWrules])){
-                e6 = 2
-              }
-            }"
+            @click="validate()"
           >
             Continue
           </v-btn>
@@ -79,6 +75,7 @@
                   :items="items"
                   label="Incident column"
                   :rules="ColumnRule"
+                  v-model="selected"
                 ></v-select>
               </v-col>
           </v-form>
@@ -87,7 +84,6 @@
             color="primary"
             @click="()=>{
               e6 = 3
-              log()
             }"
           >
             Continue
@@ -116,10 +112,13 @@
             ></v-text-field>
           </v-row>
           <v-btn
+            :loading="btnLoading"
             color="primary"
             :disabled="checked == ''"
             @click="()=>{
-              e6 = 4
+              this.excelObject.forEach(row =>{
+                    this.incidents.push(row[selected])
+                  })
               bulkEdit()
             }"
           >
@@ -166,15 +165,186 @@
         <v-icon left>{{completeIcon}}</v-icon>
         {{completeText}}
       </v-btn>
+
+      <v-btn
+        width="200px"
+        class="ma-3 text-center"
+        outlined
+        large
+        color="primary"
+        v-if="value == 100"
+        @click="()=>{
+          checkDialog = true
+        }"
+      >
+        <v-icon left>mdi-eye-check-outline</v-icon>
+        Check Results
+      </v-btn>
     </div>
+
+
+    <div class="text-center">
+      <v-snackbar
+        class="text-center"
+        v-model="snackbar"
+        success
+        :timeout="timeout"
+        color="primary"
+        text
+        
+      >
+        {{ text }}
+
+        <template v-slot:action="{ attrs }">
+          <v-btn
+            color="primary"
+            text
+            v-bind="attrs"
+            @click="snackbar = false"
+          >
+            Close
+          </v-btn>
+        </template>
+      </v-snackbar>
+    </div>
+
+
+
+    <v-dialog
+      v-model="dialog"
+      
+      max-width="400"
+    >
+      <v-card>
+        <v-card-title class="text-h5">
+          Bulk edit confirmation
+        </v-card-title>
+
+        <v-card-text>
+          You are about to update {{incidents.length}} incidents. The following changes will be applied:
+
+          <v-alert
+            color="info"
+            text
+            
+          >
+            <div v-for="change in checkedChanges" :key="change.name" >
+              <div>
+
+                <h5>
+                  {{change.name}}
+                </h5>
+              </div>
+
+              <div>
+                {{change.value}}
+              </div>
+
+              <v-divider
+                class="my-4 info"
+                style="opacity: 0.22"
+              ></v-divider>
+            </div>
+          </v-alert>
+              
+
+          Is this correct, would you like to proceed? 
+        </v-card-text>
+
+        <v-card-actions>
+          <v-spacer></v-spacer>
+
+          <v-btn
+            color="green darken-1"
+            text
+            @click="()=>{
+              dialog = false
+              updateGo()
+            }"
+          >
+            Yes
+          </v-btn>
+
+          <v-btn
+            color="red"
+            text
+            @click="()=>{
+              dialog = false
+              resetForm()
+            }"
+          >
+            No
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+    <v-dialog
+      v-model="checkDialog"
+      
+      max-width="400"
+    >
+      <v-card>
+        <v-card-title class="text-h5">
+          Results
+        </v-card-title>
+
+        <v-card-text>
+          <v-alert
+            color="info"
+            text
+            
+          >
+            <div v-for="incident in checkList" :key="incident['Incident Number']">
+              <div>
+                {{incident['Incident Number']}} - {{incident['Status']}}
+                <v-tooltip right v-if="incident['Message']">
+                  <template v-slot:activator="{ on, attrs }">
+                    <v-btn
+                      v-bind="attrs"
+                      v-on="on"
+                      icon
+                    >
+                      <v-icon
+                        color="primary lighten-1"
+                      >
+                        mdi-information-outline
+                      </v-icon>
+                    </v-btn>
+                  </template>
+                  <span>{{incident['Message']}}</span>
+                </v-tooltip>
+              </div>
+
+              <v-divider
+                class="my-4 info"
+                style="opacity: 0.22"
+              ></v-divider>
+            </div>
+          </v-alert>
+
+        </v-card-text>
+
+        <v-card-actions>
+
+          <v-btn
+            color="green darken-1"
+            text
+            @click="()=>{
+              checkDialog = false
+            }"
+          >
+            Close
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
-  
 </template>
 
 <script>
 import authenticationService from '/fejlesztes/bulkedit/src/services/authenticationService';
 import incidentUpdateService from '/fejlesztes/bulkedit/src/services/incidentUpdateService';
-import bodyGeneratorService from '/fejlesztes/bulkedit/src/services/bodyGenerator'
+import bodyGeneratorService from '/fejlesztes/bulkedit/src/services/bodyGeneratorService'
 import XLSX from 'xlsx';
 
 export default {
@@ -184,7 +354,7 @@ export default {
   },
   data () {
       return {
-        e6: 3,
+        e6: 1,
         apiUser: '',
         stepOneDone: false,
         apiPassword: '',
@@ -198,6 +368,17 @@ export default {
         enabled: false,
         items: [],
         excelObject: [],
+        snackbar: false,
+        text: '',
+        timeout: 2000,
+        btnLoading: false,
+        incidents: [],
+        checkedChanges: [],
+        checkList: [],
+        dialog: false,
+        checkDialog: false,
+        selected: null,
+        feedback: 0,
         possibilities: [
           {"check": false, "name":"caller"},
           {"check": false, "name":"branch"}, 
@@ -241,15 +422,24 @@ export default {
   },
 
   methods: {
-    validate: function(){
-      // validation API call
-      return true
+    validate: async function(){
+      this.text = ""
+      let resp = await authenticationService.validateApi(this.TOPdeskurl, this.apiUser, this.apiPassword)
+      if (resp == true){
+        this.e6 = 2
+      } else {
+        this.snackbar = true
+        this.text = "Authentication failed"
+      }
     },
     resetForm: function(){
       this.e6 = 1
       this.xlsInput = null
       this.value = 0
+      this.feedback = 0
       this.items = []
+      this.selected = null
+      this.checkList = []
       this.possibilities = [
           {"check": false, "name":"caller", "value": ""},
           {"check": false, "name":"branch", "value": ""}, 
@@ -264,21 +454,65 @@ export default {
           ]
     },
 
-    bulkEdit: function(){
-      let generatedBody = bodyGeneratorService.generateBody(this.possibilities.filter(possibility => possibility.check == true))
-      console.log(generatedBody)
-      this.interval = setInterval(() => {
-      if (this.value === 100) {
-        return (this.value = 100)
-      }
-      this.value += 10
-    }, 1000)
-    },
-    log: async function(){
-      authenticationService.validateApi(this.TOPdeskurl, this.apiUser, this.apiPassword)
-      incidentUpdateService.sendUpdateRequest("someURL", "someBODY")
+    bulkEdit: async function(){
+      this.btnLoading = true
+      this.checkedChanges = this.possibilities.filter(possibility => possibility.check == true)
+      let idRequiredChanges = [];
+      let namesArray = []
+      this.checkedChanges.forEach(checkedChange => namesArray.push(checkedChange.name))
+      namesArray.forEach(elem=>{
+        let index = this.checkedChanges.map(function(e) { return e.name; }).indexOf(elem);
+        if (this.checkedChanges[index].check == true){
+          idRequiredChanges.push(this.checkedChanges[index])
+        }
+      })
 
-      
+      let resp = await bodyGeneratorService.prepare(this.TOPdeskurl, this.apiUser, this.apiPassword, idRequiredChanges)
+      setTimeout(() => {
+        Object.keys(resp).forEach(key => {
+          // figure out which index
+          let index = this.checkedChanges.map(function(e) { return e.name; }).indexOf(key);
+          // add value to the indexed checkedChange
+          this.checkedChanges[index]['id'] = resp[key]
+        })
+
+
+        this.body = bodyGeneratorService.generateBody(this.checkedChanges)
+        this.btnLoading = false
+        this.e6 = 4
+        this.dialog = true
+
+      }, 2001);
+    },
+    updateGo: async function(){
+      let currIndex = -1;
+      this.updateOnce = async()=>{
+        ++currIndex
+        if(currIndex >= this.incidents.length){
+          clearInterval(interval);
+        } else {
+          let resp = await incidentUpdateService.sendUpdateRequest(
+            {'authentication': {
+              'TOPdeskURL': this.TOPdeskurl,
+              'username': this.apiUser,
+              'password': this.apiPassword
+              },
+              'incident': this.incidents[currIndex],
+              'body': this.body
+            }
+          )
+
+          this.checkList.push({
+            'Incident Number': resp.status < 300 ? resp.data.number : resp.config.url.split("/").pop(),
+            'Status': resp.status < 300 ? 'Done' : 'Failed',
+            'Message': resp.status < 300 ? '' : resp.data[0].message
+            })
+
+          this.feedback ++
+          this.value = Math.round(this.feedback / this.incidents.length * 100)
+        }
+      }
+      let interval = setInterval(this.updateOnce, 200);
     },
 
     processExcel: function(){
